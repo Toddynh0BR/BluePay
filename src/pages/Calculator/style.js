@@ -144,6 +144,13 @@ transition: .3s ease-in-out;
     color: #888888ff;
   }
 
+  p {
+   font-family: 'Mulish';
+   font-size: 1.6rem;
+   font-weight: 400;
+   color: #888888ff; 
+  }
+
   span {
    font-family: 'Mulish';
    font-size: 1.8rem;

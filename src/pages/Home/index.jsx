@@ -3,6 +3,7 @@ import * as S from './styles';
 import { useAuth } from '../../hooks/auth';
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
+import Swal from 'sweetalert2';
 
 import BluePayOne from '../../assets/BluePay.png';
 import { IoIosArrowUp } from "react-icons/io";
@@ -16,9 +17,21 @@ export function Home() {
     const [method, setMethod] = useState('');
     const [total, setTotal] = useState(349.5);
     const [loading, setLoading] = useState(true);
+    const [generateBTN, setGererateBTN] = useState(false)
 
     const [closed, setClosed] = useState([])
     const formatarDinheiro = new Intl.NumberFormat('pt-BR', {style: 'currency',currency: 'BRL',});
+    const Toast = Swal.mixin({
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        didOpen: (toast) => {
+          toast.onmouseenter = Swal.stopTimer;
+          toast.onmouseleave = Swal.resumeTimer;
+        }
+    });//Alertas    
 
     function formatarData(dataString) {
      const meses = [
@@ -52,31 +65,32 @@ export function Home() {
     }
     };
 
-    async function handleGenerateLink(id) {
+    async function handleGenerateLink(id, produto_id) {
       console.log("Gerando link para ID:", id);
+      setGererateBTN(true)
        try {
-        const idLimpo = id.replace(/^pay_/, '');
-        const link = `https://www.asaas.com/i/${idLimpo}`;
+        let link
+        if(id.includes('cus')) {
+         const Response = await api.post(`/create-checkout/${produto_id}`);
+
+         console.log('Resposta do back:', Response.data)
+
+         link = Response.data.checkoutUrl
+        } else {
+          const idLimpo = id.replace(/^pay_/, '');
+          link = `https://www.asaas.com/i/${idLimpo}`;
+        }
 
         window.open(link, '_blank');
        } catch (error) {
         console.error("Erro ao gerar link de pagamento:", error);
-
+                 Toast.fire({
+                    icon: "error",
+                    title: error.response.data.error || 'Erro ao gerar link de pagamento'
+                });
+       }finally {
+        setGererateBTN(false)
        }
-    };
-
-    function extrairProdutos(bbcode) {
-  // Pega todas as linhas da tabela, ignorando o cabeçalho
-  const rows = bbcode.match(/\[tr\](.*?)\[\/tr\]/gi).slice(1);
-
-  // Extrai apenas o conteúdo da primeira coluna ([td]Produto[/td])
-  const produtos = rows.map(row => {
-    const match = row.match(/\[td\](.*?)\[\/td\]/i);
-    return match ? match[1] : '';
-  });
-
-  // Junta todos os produtos em uma string com " + "
-  return produtos.join(' + ');
     };
     
     function toggleValue(id) {
@@ -127,7 +141,7 @@ export function Home() {
            <div className="info">
         <div className="Item">
          <span>Produto</span>
-         <h3>{extrairProdutos(produto.produto)}</h3>
+         <h3>{produto.produto}</h3>
         </div>
 
         {/* <div className="Item">
@@ -150,6 +164,7 @@ export function Home() {
         <div className="Item">
           <span>Link de Pagamento {produto.forma_pagamento == 'Misto' ? '(Entrada)' : (produto.forma_pagamento == 'Avista' ? '(Avista)' : '(Proxima Parcela)')}</span>
           <button
+          disabled={generateBTN}
            onClick={()=> {
             console.log('Gerando Link...')
             if (produto.forma_pagamento == 'Misto') {
@@ -158,7 +173,7 @@ export function Home() {
             };
             if (produto.forma_pagamento == 'Avista') {
               console.log('Avista')
-              handleGenerateLink(produto.asaas_id);
+              handleGenerateLink(produto.asaas_id, produto.id);
             };
             if (produto.forma_pagamento == 'Parcelado Sem Entrada') {
               console.log('Parcelado')
@@ -167,7 +182,7 @@ export function Home() {
               handleGenerateLink(proximaParcela.asaas_id);
             }
            }}
-          >Gerar
+          >{generateBTN ? 'Gerando...' : 'Gerar'}
           </button>
         </div>
 
