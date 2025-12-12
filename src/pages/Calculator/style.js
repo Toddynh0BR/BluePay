@@ -8,6 +8,9 @@ display: flex;
 
 padding-top: 3rem;
 background-color: #FAFAFA;
+
+flex-direction: column;
+display: flex;
 `
 
 export const Main = styled.main`
@@ -394,6 +397,17 @@ transition: .3s ease-in-out;
         align-items: center;
         display: flex;
         
+        .adm {
+         height: fit-content;
+         width: fit-content;
+         display: flex;
+         align-items: center;
+         gap: 1rem;
+
+         svg {
+          cursor: pointer;
+         }
+        }
         .set {
           
           animation: spinOpen 0.7s ease forwards;
@@ -540,6 +554,71 @@ transition: .3s ease-in-out;
     }
   }
  }
+}
+
+.requests {
+  flex: 1;
+  height: fit-content;
+
+  span {
+    font-family: 'Mulish';
+    font-size: 1.8rem;
+    color: #333333;
+  }
+
+  .requestList {
+    height: 50vh;
+    width: 100%;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    flex-direction: column;
+    display: flex;
+    gap: 2rem;
+
+    .request {
+      height: 8rem;
+      width: 100%;
+
+      border: 1px solid #d8d8d8ff;
+      border-radius: .6rem;
+      
+      justify-content: space-between;
+      align-items: center;
+      display: flex;
+      flex-shrink: 0;
+      padding: 1rem;
+
+      .texts {
+        height: 100%;
+        width: 50%;
+
+        flex-direction: column;
+        display: flex;
+
+        p {
+          font-family: 'Mulish';
+          font-size: 1.4rem;
+          color: #333333ff;
+        }
+      }
+
+      .buttons {
+        width: 50%;
+        height: 100%;
+
+        justify-content: flex-end;
+        align-items: center;
+        display: flex;
+        gap: 3rem;
+
+        svg {
+          cursor: pointer;
+        }
+      }
+    }
+  }
 }
 `
 

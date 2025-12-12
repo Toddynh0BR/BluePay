@@ -8,6 +8,7 @@ import Swal from 'sweetalert2';
 import { InputNumber } from 'primereact/inputnumber';
 import BluePayOne from '../../assets/BluePay.png';
 
+import { FiCheck, FiX } from "react-icons/fi";
 import { FaRegTrashAlt } from "react-icons/fa";
 import { IoIosArrowUp } from "react-icons/io";
 import { TbLogout2 } from "react-icons/tb";
@@ -150,6 +151,8 @@ export function Calculator() {
     const [closed, setClosed] = useState([])
     const [saving, setSaving] = useState(false)
 
+    const [requests, setRequests] = useState(null);
+
     async function FetchUsers() {
       setReload(true);
       setClients(null)
@@ -172,6 +175,22 @@ export function Calculator() {
        }
       }, 2400)
 
+    };
+
+    async function FetchRequests() {
+      setRequests(null)
+      try {
+        const Response = await api.get('/requests')
+
+       return setRequests(Response.data.Requests || []);
+      } catch (error) {
+        console.error(error)
+        if (error.response.status(400)) return;
+                return Toast.fire({
+                    icon: "error",
+                    title: error.response.data.error || 'Erro ao buscar pedidos de exclusão'
+                });
+      }
     };
 
     function toggleValue(id) {
@@ -269,8 +288,12 @@ export function Calculator() {
     };
 
     useEffect(()=> {
-FetchUsers()
-    }, [])
+     FetchUsers()
+
+     if(User?.id && User.admin_level == 'ADM') [
+        FetchRequests()
+     ]
+    }, [User])
 
     
 
@@ -518,7 +541,32 @@ Crédito 12x  ----------	{formatarDinheiro.format((calcularTaxaCredito(price, 12
              clients.map((client)=> (
               <div key={client.id} className={`client ${closed.includes(client.id) ? 'cOpen' : ''}`}>
                <div className="topper">
-                <span>{client.name}</span>
+                <div className="adm">
+                  {User.admin_level == 'ADM' ? 
+                   <FaRegTrashAlt size={20} color="#333333" onClick={async ()=> {
+                    try {
+                      Toast.fire({
+                    title: 'Excluindo usuário'
+                });
+                      await api.delete(`/delete?id=${client.id}&what=user`)
+                      FetchUsers();
+                      return Toast.fire({
+                    icon: "success",
+                    title: 'Usuário excluido com sucesso!'
+                });
+                    }catch(error) {
+                      console.error(error)
+                      return Toast.fire({
+                    icon: "error",
+                    title: error.response.data.error || 'Erro ao excluir usuário'
+                });
+                    }
+                   }}/>
+                  :
+                   null
+                  }
+                  <span>{client.name}</span>
+                </div>
 
                 <div className={`set ${closed.includes(client.id) ? 'closeds' : ''}`}>
                  <IoIosArrowUp   onClick={()=> {toggleValue(client.id); console.log('id:', client.id, 'closed:', closed)}} size={25} color='#333333'/>
@@ -620,17 +668,23 @@ Crédito 12x  ----------	{formatarDinheiro.format((calcularTaxaCredito(price, 12
 
                   <div className="hover">
                    <FaRegTrashAlt size={24} color="#fff" onClick={async ()=> {
-                if (User.admin_leve != 'ADM') {
+                if (User.admin_level != 'ADM') {
                                         Toast.fire({
                     icon: "Warning",
-                    title: 'Enviando solicitação de exclusão para Jhone'
+                    title: 'Enviando solicitação de exclusão'
+                });
+                await api.post('/request-delete', { user_id: User.id, product_id: produto.id })
+                  Toast.fire({
+                    icon: "Warning",
+                    title: 'Solicitação enviada com sucesso!'
                 });
               return                         
               }
               
                     try {
    
-                      await api.delete('/delete', { id: produto.id, what: 'product'})
+                     console.log({ id: produto.id, what: 'product'})
+                      await api.delete(`/delete?id=${produto.id}&what=product`)
                       FetchUsers()
                       Toast.fire({
                     icon: "success",
@@ -675,6 +729,87 @@ Crédito 12x  ----------	{formatarDinheiro.format((calcularTaxaCredito(price, 12
          </div>
         </div>
       </S.Main>
+
+      { User.admin_level == 'ADM' ?
+      <S.Main>
+        <header>
+         <div>
+         
+         <h2>
+Solicitações de exclusão
+         </h2>
+  
+         </div>
+  
+        
+        </header>
+
+        <div className="requests">
+         { requests == null ?
+          <span>Buscando pedidos de exclusão...</span> 
+         :
+          requests.length ?
+          <div className="requestList">
+           { requests.map((request)=> (
+            <div key={request.id} className="request">
+              <div className="texts">
+                <p><strong>Produto:</strong> {request.produto}</p>
+                <p><strong>Cliente:</strong> {request.cliente}</p>
+                <p><strong>Consultor:</strong> {request.usuario}</p>
+              </div>
+
+              <div className="buttons">
+               <FiCheck size={25} color="#42a902ff" onClick={async ()=> {
+                                      Toast.fire({
+                    title: 'Excluindo produto'
+                });
+                try {
+
+                 await api.delete(`/delete?id=${request.product_id}&what=product&request_id=${request.id}`);
+                 FetchRequests()
+                 return Toast.fire({
+                    icon: "success",
+                    title: 'Produto excluido com sucesso!'
+                });
+                } catch(error){
+                  console.error(error)
+                  return Toast.fire({
+                    icon: "error",
+                    title: error.response.data.error || 'Erro aceitar pedido de exclusão'
+                });
+                }
+               }}/>
+               <FiX size={25} color="#b60404fd" onClick={async ()=> {
+                                      Toast.fire({
+                    title: 'Recusando pedido de exclusão'
+                });
+                 try {
+                  await api.delete(`/delete-request?request_id=${request.id}`);
+                  FetchRequests();
+                  return Toast.fire({
+                    icon: "Success",
+                    title: 'Pedido recusado!'
+                });
+                 }catch(error) {
+                  console.error(error)
+                   return Toast.fire({
+                    icon: "error",
+                    title: error.response.data.error || 'Erro recusar pedido de exclusão'
+                });
+                 }
+               }}/>
+              </div>
+            </div>
+           ))}
+          </div>
+         :
+          <span>Nenhum pedido de exclusão</span>
+         }
+        </div>
+      </S.Main>
+      :
+      null 
+      }
      </S.Container>
     )
 }
