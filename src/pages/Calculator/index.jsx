@@ -8,14 +8,25 @@ import Swal from 'sweetalert2';
 import { InputNumber } from 'primereact/inputnumber';
 import BluePayOne from '../../assets/BluePay.png';
 
+import { FaRegTrashAlt, FaPen, FaPlus, FaCamera, FaUsers  } from "react-icons/fa";
+import { FaCalculator, FaUsersGear } from "react-icons/fa6";
 import { FiCheck, FiX } from "react-icons/fi";
-import { FaRegTrashAlt } from "react-icons/fa";
 import { IoIosArrowUp } from "react-icons/io";
+import { MdDashboard } from "react-icons/md";
 import { TbLogout2 } from "react-icons/tb";
 import { IoReload } from "react-icons/io5";
 
+import { useNavigate } from 'react-router-dom';
+
+import DefaultUser from '../../assets/user.png'
+
+import { Metas } from "../../components/metas";
+
 export function Calculator() {
     const { Logout, User } = useAuth();
+    const [loading, setLoading] = useState(false)
+    const navigate = useNavigate();
+
     const Toast = Swal.mixin({
         toast: true,
         position: "top-end",
@@ -145,11 +156,12 @@ export function Calculator() {
     ////////              Clientes                  ////////
     ////////////////////////////////////////////////////////   
     
-    const [reload, setReload] = useState(false);
     const [clients, setClients] = useState(null);
+    const [sellers, setSellers] = useState(null);
     const [modified, setModified] = useState([]);   
-    const [closed, setClosed] = useState([])
+    const [reload, setReload] = useState(false);
     const [saving, setSaving] = useState(false)
+    const [closed, setClosed] = useState([])
 
     const [requests, setRequests] = useState(null);
 
@@ -160,12 +172,23 @@ export function Calculator() {
       
       setTimeout(async ()=> {
         try {
-        const response = await api.get('/clients');
         
-          setClients(response.data || []);
+        if(User.admin_level != 'ADM') {
+        const response = await api.get(`/my-clients/${User.id}`);
+         
+        setClients(response.data || [])
+        } else {
+         const response = await api.get('/clients');
+         const SellersUsers = await api.get('/sellers');
+ 
+         setSellers(SellersUsers.data.ClientsForSeller || [])
+         setClients(response.data || []);
+        }
+       
        
        } catch(error) {
         console.error(error)
+        setClients([])
         return Toast.fire({
                     icon: "error",
                     title: error.response.data.error || 'Erro ao buscar clientes'
@@ -223,7 +246,7 @@ export function Calculator() {
      for (const item of modified) {
      // verifica nome
      if (!item.name || item.name.trim() === "") {
-       alert(`O campo nome do cliente ID ${item.id} não pode estar vazio.`);
+       alert(`O campo nome de usuario com ID ${item.id} não pode estar vazio.`);
        setSaving(false)
       return;
      }
@@ -232,7 +255,7 @@ export function Calculator() {
      if (item.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(item.email)) {
-        alert(`Email inválido para o cliente ID ${item.id}`);
+        alert(`Email inválido para o usuariocom ID ${item.id}`);
         setSaving(false)
         return;
       }
@@ -287,17 +310,72 @@ export function Calculator() {
   }
     };
 
+    async function handleAddSeller() {
+     if (!nsavatar || !nsname || !nsemail || !nspassword) return Toast.fire({
+                    icon: "warning",
+                    title: 'Informações faltando'
+                });
+
+     const formData = new FormData();
+     formData.append("name", nsname);
+     formData.append("email", nsemail);
+     formData.append("password", nspassword);
+     formData.append("avatar", nsavatar);
+
+     setNsButton(true)
+     try {
+      await api.post("/new-seller", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      });
+
+      Toast.fire({
+          icon: "success",
+          title: 'Vendedor adicionado com sucesso!'
+        });
+
+      setNSName("");
+      setNSEmail("");
+      setNSPassword("");
+      setNSAvatar(null);
+      setAddSeller(false);
+
+      FetchUsers()
+
+     }catch {
+      console.error(error);
+      return  Toast.fire({
+                icon: "error",
+                title: 'Informações faltando'
+              });
+     }finally {
+      setNsButton(false)
+     }
+    }
+
     useEffect(()=> {
      FetchUsers()
 
-     if(User?.id && User.admin_level == 'ADM') [
+     if(User?.id && User.admin_level == 'ADM') {
         FetchRequests()
-     ]
+    }
+    setTimeout(()=> {
+      setLoading(false);
+    }, 2000)
     }, [User])
 
-    
+    const [addingSeller, setAddSeller] = useState(false);
+    const [nspassword, setNSPassword] = useState('');
+    const [nsavatar, setNSAvatar] = useState('');
+    const [nsemail, setNSEmail] = useState('');
+    const [nsname, setNSName] = useState('');
+    const [nsbutton, setNsButton] = useState(false);
 
-    if (!User?.id) return <S.Loading><div></div></S.Loading>;
+    const [focusedS, setFocusedS] = useState('dash');
+    const [pageOpen, setPageOpen] = useState('dash');
+    
+    if (!User?.id || loading) return <S.Loading><div></div></S.Loading>;
 
     return(
      <S.Container>
@@ -305,19 +383,76 @@ export function Calculator() {
         <header>
          <div>
           <img src={BluePayOne} alt="BluePay" />
-         
+          
          <h2>
           Olá {primeirosDoisNomes(User.name)}! <br />
-          <h5>Acesse seu(s) link(s) de pagamento aqui.</h5>
+          <h5>Acesse o dashboard da BluePay aqui.</h5>
          </h2>
+
+          <div onClick={()=> {
+            setPageOpen('dash')
+            setFocusedS(focusedS == 'sellers' ? 'clients' : focusedS == 'clients' ? 'calculator'  : 'dash'); 
+            setTimeout(()=> {
+              setFocusedS(focusedS == 'calculator' ? 'dash' : 'calculator')
+            }, 200)
+            setTimeout(()=> {
+              setFocusedS('dash')
+            }, 400)
+            }} className={focusedS == 'dash' ? 'focusedSpan span' : 'span'}>
+            <MdDashboard size={20} color="#5a5a5a"/>
+            Dashboard
+          </div>
   
+          <div onClick={()=> {
+            setPageOpen('calculator')
+            setFocusedS(focusedS == 'sellers' ? 'clients' : 'calculator')
+            setTimeout(()=> {
+              setFocusedS('calculator')
+            }, 200)
+          }} className={focusedS == 'calculator' ? 'focusedSpan span' : 'span'}>
+            <FaCalculator size={20} color="#5a5a5a"/>
+            Calculadora
+          </div>
+
+          <div onClick={()=> {
+            setPageOpen('clients')
+            setFocusedS(focusedS == 'calculator' ? 'clients' : focusedS == 'sellers' ? 'clients'  : 'calculator'); 
+            setTimeout(()=> {
+              setFocusedS('clients')
+            }, 200)
+            }} className={focusedS == 'clients' ? 'focusedSpan span' : 'span'}>
+            <FaUsers size={20} color="#5a5a5a"/>
+            Meus Clientes  
+          </div>
+
+          {
+            User.admin_level == 'ADM' ?
+            <div onClick={()=> {
+            setPageOpen("sellers")
+            setFocusedS(focusedS == 'dash' ? 'calculator' : focusedS == 'calculator' ? 'clients'  : 'sellers'); 
+            setTimeout(()=> {
+              setFocusedS(focusedS == 'clients' ? 'sellers' : 'clients')
+            }, 200)
+            setTimeout(()=> {
+              setFocusedS('sellers')
+            }, 400)
+            }} className={focusedS == 'sellers' ? 'focusedSpan span' : 'span'}>
+            <FaUsersGear size={20} color="#5a5a5a"/>
+            Vendedores
+          </div>
+          :
+          null
+          }
          </div>
   
          <TbLogout2 onClick={()=> Logout()} size={30} fontWeight='bold' color='#333333'/>
         </header>
 
-        <div className="content">
-         <div className="calculator">
+        { pageOpen == 'dash' ?
+        <Metas id={User.admin_level == 'ADM' ? null : User.id}/>
+        :
+         pageOpen == 'calculator' ?
+          <div className="calculatoradm">
           <h3>Calculadora de juros/taxas</h3>
 
           <div className="row">
@@ -515,9 +650,10 @@ Crédito 12x  ----------	{formatarDinheiro.format((calcularTaxaCredito(price, 12
            
           </div>  
 
-         </div>
-
-         <div className="clients">
+          </div>
+         :
+         pageOpen == 'clients' ?
+          <div className="clientsadm">
           <div className="top">
             <h3>Clientes</h3>
 
@@ -565,6 +701,13 @@ Crédito 12x  ----------	{formatarDinheiro.format((calcularTaxaCredito(price, 12
                   :
                    null
                   }
+
+                  {User.admin_level == 'ADM' ? 
+                   <FaPen size={20} color="#333333" onClick={()=> navigate(`/user-info/${client.id}`)}/>
+                  :
+                   null
+                  }
+
                   <span>{client.name}</span>
                 </div>
 
@@ -726,10 +869,162 @@ Crédito 12x  ----------	{formatarDinheiro.format((calcularTaxaCredito(price, 12
           :
           <span>Nenhum cliente cadastrado ainda.</span>
           }
-         </div>
-        </div>
-      </S.Main>
+          </div>
+         :
+          <div className="clientsadm">
+                      
+           <div className="top">
+            <h3> <FaPlus size={20} onClick={()=> setAddSeller(true)}/> Vendedores</h3>
+          </div>
 
+
+          { addingSeller ?
+           <div className="addSeller">
+           <div className="title">
+             <h3>Adicionar vendedor</h3>
+             <span onClick={()=> {
+              setAddSeller(false);
+              setNSPassword('')
+              setNSAvatar('')
+              setNSEmail('')
+              setNSName('')
+             }}>cancelar</span>
+           </div>
+            <div className="form">
+             <div className="image">
+              <img src={nsavatar ? URL.createObjectURL(nsavatar) : DefaultUser} alt="" />
+              <label htmlFor="image">
+                <FaCamera size={24} />
+              </label>
+              <input onChange={e => setNSAvatar(e.target.files[0])}  type="file" id="image" accept="image/png, image/jpeg, .png, .jpg"/>
+             </div>
+
+             <div className="inputs">
+              <div className="input-wrapper">
+                <label htmlFor="name">Nome</label>
+                <input 
+                 value={nsname} 
+                 type="text" 
+                 id="name" 
+                 placeholder="Apenas primeiro e segundo nome"
+                 onChange={(e)=> setNSName(e.target.value)}
+                />
+              </div>
+              <div className="input-wrapper">
+                <label htmlFor="email">Email</label>
+                <input 
+                 value={nsemail} 
+                 type="email" 
+                 id="email" 
+                 placeholder="Email do vendedor"
+                 onChange={(e)=> setNSEmail(e.target.value)}
+                />
+              </div>
+             </div>
+            <div className="inputs">
+              <div className="input-wrapper">
+                <label htmlFor="password">Senha</label>
+                <input 
+                 value={nspassword} 
+                 type="text" 
+                 id="password" 
+                 placeholder="Senha do vendedor"
+                 onChange={(e)=> setNSPassword(e.target.value)}
+                />
+              </div>
+
+              <div className="input-wrapper">
+                <label htmlFor="password">Criar vendedor:</label>
+                <button disabled={nsbutton} onClick={()=> handleAddSeller()}>
+                {nsbutton ? 'Criando...' : 'Criar'}
+              </button>
+              </div>
+              
+             
+             </div>
+            </div>
+           </div>
+          :
+          sellers == null ?
+           <span>Buscando vendedores...</span>
+          :
+           sellers.length ?
+           <div className="list">
+            {
+             sellers.map((client)=> (
+              <div key={client.id} className='client cOpen seller'>
+               <div className="topper">
+                <div className="adm">
+                
+                   <FaRegTrashAlt size={20} color="#333333" onClick={async ()=> {
+                    try {
+                      Toast.fire({
+                    title: 'Excluindo vendedor'
+                });
+                      await api.delete(`/delete?id=${client.id}&what=user`)
+                      FetchUsers();
+                      return Toast.fire({
+                    icon: "success",
+                    title: 'Vendedor excluido com sucesso!'
+                });
+                    }catch(error) {
+                      console.error(error)
+                      return Toast.fire({
+                    icon: "error",
+                    title: error.response.data.error || 'Erro ao excluir vendedor'
+                });
+                    }
+                   }}/>
+
+                  <span>{client.name}</span>
+                </div>
+
+               
+               </div>
+
+               <div className="infors closed">
+                <div className="rowI">
+                   <div className="input-wrapperI">
+                   <span><strong>Nome</strong>:  </span>
+                   <input
+                    type="text"
+                    autoComplete="off"
+                    disabled
+                    placeholder={client.name}
+                    />
+                  </div>
+
+                </div>
+
+                <div className="rowI">         
+                  <div className="input-wrapperI">
+                   <span><strong>E-mail</strong>:</span>
+                   <input
+                    type="text"
+                    autoComplete="off"
+                    placeholder={client.email}
+                    disabled
+                    />
+                  </div>
+                </div>
+
+                <span>Numero de clientes desse mês: { client.clients.length}</span>
+               </div>
+              </div>
+             ))
+            }
+           </div>
+          :
+           <span>Nenhum vendedor cadastrado ainda.</span>
+          }
+        
+         
+          </div>
+        }
+         
+      </S.Main>
+      
+      
       { User.admin_level == 'ADM' ?
       <S.Main>
         <header>

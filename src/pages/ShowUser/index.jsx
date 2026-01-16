@@ -1,16 +1,16 @@
 import * as S from './styles';
 
-import { useAuth } from '../../hooks/auth';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import Swal from 'sweetalert2';
 
 import BluePayOne from '../../assets/BluePay.png';
-import { IoIosArrowUp } from "react-icons/io";
-import { TbLogout2 } from "react-icons/tb";
+import { IoIosArrowUp, IoMdReturnLeft } from "react-icons/io";
 
-export function Home() {
-    const { Logout} = useAuth();
+export function ShowUser() {
+    const { id } = useParams();
+    const navigate = useNavigate();
 
     const [user, setUser] = useState({});
     const [produtos, setProdutos] = useState([]);
@@ -57,7 +57,8 @@ export function Home() {
       console.log('iniciando busca')
       const response = await api.get(`/info/${id}`);
 
-      setProdutos(response.data || []);
+      setUser(response.data.user)
+      setProdutos(response.data.produtos || []);
     } catch (error) {
      console.error("Erro ao buscar informações do usuário:", error);
     } finally {
@@ -101,21 +102,13 @@ export function Home() {
       );
     };
 
-     useEffect(() => {
-      const User = localStorage.getItem('@payblue:user');
+    useEffect(() => {
+       fetchData(Number(id));
+    }, []);
 
-      setUser(JSON.parse(User));
-     }, []);
-
-     useEffect(() => {
-      if (user?.id) {
-       fetchData(user.id);
-      }
-     }, [user?.id]);
-
-     if (!user?.id || loading || produtos == null) return <S.Loading>
-      <div></div>
-     </S.Loading>;
+    if (!user?.id || loading || produtos == null) return <S.Loading>
+     <div></div>
+    </S.Loading>;
  
     return(
      <S.Container>
@@ -125,13 +118,13 @@ export function Home() {
         <img src={BluePayOne} alt="BluePay" />
        
        <h2>
-        Olá {user.name}! <br />
-        <h5>Acesse seu(s) link(s) de pagamento aqui.</h5>
+        Olá BluePay! <br />
+        <h5>Essas são as informações de <strong>{user.name}</strong></h5>
        </h2>
 
        </div>
 
-       <TbLogout2 onClick={()=> Logout()} size={30} fontWeight='bold' color='#333333'/>
+       <IoMdReturnLeft onClick={()=> navigate('/')} size={30} fontWeight='bold' color='#333333'/>
       </header>
 
        {
@@ -162,31 +155,74 @@ export function Home() {
         </div> */}
 
         <div className="Item">
-          <span>Link de Pagamento {produto.forma_pagamento == 'Misto' ? '(Entrada)' : (produto.forma_pagamento == 'Avista' ? '(Avista)' : '(Proxima Parcela)')}</span>
+          <span>Definir {produto.forma_pagamento == 'Misto' ? 'Entrada' : (produto.forma_pagamento == 'Avista' ? 'Produto' : 'proxima parcela')} como paga</span>
           <button
           disabled={generateBTN}
-           onClick={()=> {
-            console.log('Gerando Link...')
-            if (produto.forma_pagamento == 'Misto') {
+           onClick={async ()=> {
+            console.log('Definindo como paga...')
+            setGererateBTN(true)
+            
+            try {
+           console.log('teste')
+             if (produto.forma_pagamento == 'Misto') {
               console.log('Misto')
-              handleGenerateLink(produto.entrada.asaas_id);
-            };
-            if (produto.forma_pagamento == 'Avista') {
+              const Response = await api.put('set-payment', { product_id: produto.id, parcela_num: 0, entrada: true })
+
+              if (Response.status != 200) throw new Error(Response.data.error || 'erro desconhecido.')
+              
+              fetchData(id)
+              
+              return Toast.fire({
+                    icon: "success",
+                    title: 'Entrada atualizada com sucesso!'
+              });
+             };
+             if (produto.forma_pagamento == 'Avista') {
               console.log('Avista')
-              handleGenerateLink(produto.asaas_id, produto.id);
-            };
-            if (produto.forma_pagamento == 'Parcelado Sem Entrada') {
+              const Response = await api.put('set-payment', { product_id: produto.id, parcela_num: 0, entrada: false })
+
+              if (Response.status != 200) throw new Error(Response.data.error || 'erro desconhecido.')
+              
+              fetchData(id)
+
+              return Toast.fire({
+                    icon: "success",
+                    title: 'Produto atualizada com sucesso!'
+              });
+             };
+             if (produto.forma_pagamento == 'Parcelado Sem Entrada' || produto.forma_pagamento == 'Parcelado') {
               console.log('Parcelado')
               const proximaParcela = produto.parcelas.find(parcela => parcela.status.toLowerCase() === 'pendente');
 
-              handleGenerateLink(proximaParcela.asaas_id);
-            }
+              const Response = await api.put('set-payment', { 
+                product_id: produto.id,
+                parcela_num: proximaParcela.numero_parcela,
+                entrada: false })
+
+              if (Response.status != 200) throw new Error(Response.data.error || 'erro desconhecido.')
+              
+              fetchData(id)
+
+              return Toast.fire({
+                    icon: "success",
+                    title: 'Parcela atualizada com sucesso!'
+              });
+             }
+            } catch(error) {
+              console.error(error)
+              return Toast.fire({
+                    icon: "error",
+                    title: error.message || error.data.error ||  'Erro ao atualizar status'
+              });
+            } finally {
+              setGererateBTN(false)
+            };
            }}
-          >{generateBTN ? 'Gerando...' : 'Gerar'}
+          >{generateBTN ? 'Carregando...' : 'Definir'}
           </button>
         </div>
 
-      </div>
+           </div>
 
       <div className="bills">
         <span>Parcelas</span>
@@ -217,7 +253,7 @@ export function Home() {
          </span>
 
          <span>
-          Link Pagamento
+          Função
          </span>
 
           <div className={`set ${closed.includes(produto.id) ? 'closeds' : ''}`}>
@@ -261,9 +297,36 @@ export function Home() {
              </span>
 
             
-              <button onClick={()=> {
-                handleGenerateLink(item.asaas_id)
-              }}>Gerar</button>
+            { item.status == 'RECEIVED' || item.status == 'RECEIVED_IN_CASH' ? 
+            null
+            :
+             <button onClick={async (event)=> {
+                event.target.innerText = 'Carregando...';
+                try {
+                  const Response = await api.put('set-payment', {
+                    product_id: item.product_id,
+                    parcela_num: item.numero_parcela, 
+                    entrada: false
+                  });
+
+                  if (Response.status != 200) throw new Error(Response.data.error || 'Erro ao atualizar parcela.')
+                  
+                    fetchData(id)
+                  return Toast.fire({
+                    icon: "success",
+                    title: 'Status de parcela atualizado'
+                 });
+                } catch {
+                 console.error(error)
+                 return Toast.fire({
+                    icon: "error",
+                    title: error.message || error.data.error || 'Erro ao atualizar status de parcela'
+                 });
+                }finally {
+                  event.target.innerText = 'Definir como paga';
+                }
+              }}>Definir como paga</button>
+            }
              
             </div>
             
@@ -309,9 +372,36 @@ export function Home() {
              </span>
 
             
-              <button onClick={()=> {
-                handleGenerateLink(item.asaas_id)
-              }}>Gerar</button>
+            { item.status == 'RECEIVED' || item.status == 'RECEIVED_IN_CASH' ? 
+            null
+            :
+             <button onClick={async (event)=> {
+                event.target.innerText = 'Carregando...';
+                try {
+                  const Response = await api.put('set-payment', {
+                    product_id: item.product_id,
+                    parcela_num: item.numero_parcela, 
+                    entrada: false
+                  });
+
+                  if (Response.status != 200) throw new Error(Response.data.error || 'Erro ao atualizar parcela.')
+                  
+                    fetchData(id)
+                  return Toast.fire({
+                    icon: "success",
+                    title: 'Status de parcela atualizado'
+                 });
+                } catch {
+                 console.error(error)
+                 return Toast.fire({
+                    icon: "error",
+                    title: error.message || error.data.error || 'Erro ao atualizar status de parcela'
+                 });
+                }finally {
+                  event.target.innerText = 'Definir como paga';
+                }
+              }}>Definir como paga</button>
+            }
              
             </div>
             

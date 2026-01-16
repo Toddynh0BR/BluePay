@@ -138,7 +138,7 @@ button {
  width: 100%;
 
  margin-top: .5rem;
- background-color: #0000c6;
+ background-color: rgba(0,0,198,1);
  border-radius: .6rem;
  border: none;
 
@@ -149,7 +149,7 @@ button {
 
  transition: .3s ease-in-out;
  &:hover {
-  background-color: #4b00cc;
+  background-color: rgba(75, 0, 204, 1);
   cursor: pointer;
  }
 }
@@ -395,10 +395,11 @@ button {
 }
 
 .closed {
-    .parcela {
+ 
+ animation: close 0.7s ease forwards;
+   .parcela {
     opacity: 0;
   }
- animation: close 0.7s ease forwards;
 }
 
 @keyframes close {
@@ -409,6 +410,7 @@ button {
  to{
   height: 5rem;
   overflow: hidden;
+
  }
 } 
 }
